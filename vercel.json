@@ -1,8 +1,7 @@
 {
   "functions": {
     "app/api/cron/route.js": {
-      "runtime": "edge",
-      "schedule": "@daily"
+      "runtime": "edge"
     }
   }
 }

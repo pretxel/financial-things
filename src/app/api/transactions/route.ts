@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
 
     const { body, response } = await validateRequestBody(request);
     if (response || !body) {
-      return response;
+      return response!;
     }
 
     for (const product of body) {

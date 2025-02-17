@@ -1,8 +1,22 @@
 import { NextResponse, NextRequest } from "next/server";
 import { PrismaClient, Transaction } from "@prisma/client";
+import { z } from "zod";
 
 const SECRET_KEY_API = process.env.SECRET_KEY_API;
 const prisma = new PrismaClient();
+
+const transactionSchema = z.object({
+  amount: z.number(),
+  description: z.string(),
+  date2: z.string(),
+  transactionId: z.string(),
+});
+
+const productSchema = z.object({
+  transactions: z.array(transactionSchema),
+});
+
+const requestBodySchema = z.array(productSchema);
 
 async function validateToken(
   request: NextRequest
@@ -25,22 +39,25 @@ async function validateToken(
   return null;
 }
 
-async function validateRequestBody(
-  request: NextRequest
-): Promise<{ body: any; response: NextResponse | null }> {
-  const body = await request.json();
+async function validateRequestBody(request: NextRequest): Promise<{
+  body: z.infer<typeof requestBodySchema> | null;
+  response: NextResponse | null;
+}> {
+  try {
+    const body = await request.json();
 
-  if (!body || Object.keys(body).length === 0) {
+    const parsedBody = requestBodySchema.parse(body);
+
+    return { body: parsedBody, response: null };
+  } catch (error: unknown) {
     return {
       body: null,
       response: NextResponse.json(
-        { error: "No data provided in the request body" },
+        { error: "Invalid request body", details: error },
         { status: 400 }
       ),
     };
   }
-
-  return { body, response: null };
 }
 
 function parseDate(dateString: string): Date {
@@ -48,7 +65,7 @@ function parseDate(dateString: string): Date {
   return new Date(`${year}-${month}-${day}`);
 }
 
-async function saveTransaction(transaction: any) {
+async function saveTransaction(transaction: z.infer<typeof transactionSchema>) {
   if (!transaction.amount || !transaction.description || !transaction.date2) {
     throw new Error("Invalid transaction data");
   }
@@ -81,7 +98,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { body, response } = await validateRequestBody(request);
-    if (response) {
+    if (response || !body) {
       return response;
     }
 

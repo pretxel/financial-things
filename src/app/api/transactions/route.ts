@@ -13,7 +13,7 @@ const transactionSchema = z.object({
 });
 
 const productSchema = z.object({
-  transactions: z.array(transactionSchema),
+  transactions: z.array(transactionSchema).optional(),
 });
 
 const requestBodySchema = z.array(productSchema);

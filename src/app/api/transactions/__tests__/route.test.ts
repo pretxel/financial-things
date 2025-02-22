@@ -1,7 +1,6 @@
 import "reflect-metadata";
 import { NextRequest } from "next/server";
 import { POST } from "../route";
-import { Auth } from "../Auth";
 
 describe("POST /api/transactions", () => {
   it("should process transactions and return success when token and body are valid", async () => {
@@ -26,9 +25,6 @@ describe("POST /api/transactions", () => {
     ];
 
     jest.spyOn(mockRequest, "json").mockResolvedValue(mockBody);
-    jest
-      .spyOn(Auth.prototype, "getSecretKey")
-      .mockImplementation(() => "valid-token");
 
     const response = await POST(mockRequest);
     const responseData = await response.json();

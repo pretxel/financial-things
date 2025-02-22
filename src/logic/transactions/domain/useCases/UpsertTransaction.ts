@@ -2,9 +2,16 @@ import { Service } from "diod";
 import { TransactionRepository } from "../repositories/TransactionRepository";
 import { ServiceTransaction, Transaction } from "../entities/Transaction";
 import { TransactionDTO } from "../dtos/TransactionDTO";
+import { DocumentRepository } from "../repositories/DocumentRepository";
+import { EmbeddingGenerator } from "../embeddings/EmbeddingGenerator";
+
 @Service()
 export class UpsertTransactionUseCase {
-  constructor(private readonly transactionRepository: TransactionRepository) {}
+  constructor(
+    private readonly transactionRepository: TransactionRepository,
+    private readonly documentRepository: DocumentRepository,
+    private readonly embeddingGenerator: EmbeddingGenerator
+  ) {}
 
   private parseDate(dateString: string): Date {
     const [day, month, year] = dateString.split("-");
@@ -21,6 +28,18 @@ export class UpsertTransactionUseCase {
       service: ServiceTransaction.SANTANDER,
     };
 
-    await this.transactionRepository.upsertTransaction(transaction);
+    const transactionCreated =
+      await this.transactionRepository.upsertTransaction(transaction);
+
+    if (transactionCreated) {
+      const content = `${transaction.description}, ${transaction.operationDate}, ${transaction.amount}`;
+      const embedding = await this.embeddingGenerator.createEmbedding(content);
+
+      if (!embedding) {
+        return;
+      }
+
+      await this.documentRepository.insertDocument(embedding, content);
+    }
   }
 }

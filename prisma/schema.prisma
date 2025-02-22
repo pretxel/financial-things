@@ -19,3 +19,10 @@ model Transaction {
   referenceId   String   @unique
   service       Service
 }
+
+model document {
+  id        String                 @id @default(cuid())
+  content   String
+  namespace String?                @default("default")
+  vector    Unsupported("vector")?
+}

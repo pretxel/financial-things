@@ -1,9 +1,9 @@
+import "reflect-metadata";
 import { NextResponse, NextRequest } from "next/server";
-import { PrismaClient, Transaction } from "@prisma/client";
 import { z } from "zod";
-
-const SECRET_KEY_API = process.env.SECRET_KEY_API;
-const prisma = new PrismaClient();
+import { Auth } from "./Auth";
+import { container } from "@/logic/transactions/infra/diod.config";
+import { UpsertTransactionUseCase } from "@/logic/transactions/domain/useCases/UpsertTransaction";
 
 const transactionSchema = z.object({
   amount: z.number(),
@@ -17,27 +17,6 @@ const productSchema = z.object({
 });
 
 const requestBodySchema = z.array(productSchema);
-
-async function validateToken(
-  request: NextRequest
-): Promise<NextResponse | null> {
-  const authHeader = request.headers.get("Authorization");
-
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return NextResponse.json(
-      { error: "No valid token provided" },
-      { status: 401 }
-    );
-  }
-
-  const token = authHeader.split(" ")[1];
-
-  if (token !== SECRET_KEY_API) {
-    return NextResponse.json({ error: "Invalid token" }, { status: 403 });
-  }
-
-  return null;
-}
 
 async function validateRequestBody(request: NextRequest): Promise<{
   body: z.infer<typeof requestBodySchema> | null;
@@ -60,39 +39,11 @@ async function validateRequestBody(request: NextRequest): Promise<{
   }
 }
 
-function parseDate(dateString: string): Date {
-  const [day, month, year] = dateString.split("-");
-  return new Date(`${year}-${month}-${day}`);
-}
-
-async function saveTransaction(transaction: z.infer<typeof transactionSchema>) {
-  if (!transaction.amount || !transaction.description || !transaction.date2) {
-    throw new Error("Invalid transaction data");
-  }
-
-  const transactionRow: Omit<Transaction, "id"> = {
-    amount: transaction.amount,
-    description: transaction.description,
-    operationDate: parseDate(transaction.date2),
-    referenceId: transaction.transactionId,
-    service: "SANTANDER",
-  };
-
+export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    await prisma.transaction.upsert({
-      where: { referenceId: transaction.transactionId },
-      update: transactionRow,
-      create: transactionRow,
-    });
-  } catch (error) {
-    console.error("Error saving transaction:", error);
-    throw new Error("Error saving transaction");
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const tokenValidationResponse = await validateToken(request);
+    const auth = new Auth();
+    const upsertTransactionUseCase = container.get(UpsertTransactionUseCase);
+    const tokenValidationResponse = await auth.validateToken(request);
     if (tokenValidationResponse) {
       return tokenValidationResponse;
     }
@@ -111,7 +62,7 @@ export async function POST(request: NextRequest) {
       }
       for (const transaction of product.transactions) {
         console.log(transaction);
-        await saveTransaction(transaction);
+        await upsertTransactionUseCase.execute(transaction);
       }
     }
 
